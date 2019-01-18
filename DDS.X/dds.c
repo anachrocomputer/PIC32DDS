@@ -105,6 +105,15 @@ void __ISR(_TIMER_4_VECTOR, ipl1) Timer4Handler(void)
     
     SPI2BUF = (0 << 15) | (1 << 13) | (1 << 12) | Sinbuf[i];
     
+    if (i < 2048)
+    {
+        LATDSET = _LATD_LATD0_MASK;     // Assert SYNC
+    }
+    else
+    {
+        LATDCLR = _LATD_LATD0_MASK;     // De-assert SYNC
+    }
+    
     if (flag > 31)
     {
         PR4 = 907;
@@ -296,23 +305,6 @@ static void SPI2_begin(void)
     SPI2CONbits.ON = 1;
 }
 
-
-/* toneT2 --- generate a tone of the given frequency via Timer 2 and OC2 */
-
-void toneT2(const int freq)
-{
-    if (freq == 0)
-    {
-        OC2RS = 0;
-    }
-    else
-    {
-        const int div = (40000000 / 64) / freq;
-        PR2 = div;
-        OC2RS = div / 2;
-    }
-}
-
 void main(void)
 {
     char buf[32];
@@ -327,7 +319,8 @@ void main(void)
     TRISAbits.TRISA7 = 0;   // LED5 as output
     TRISAbits.TRISA6 = 0;   // LED5 as output
     
-    TRISAbits.TRISA4 = 0;   // P7 pin 6 as output (timer toggle))
+    TRISAbits.TRISA4 = 0;   // RA4 P7 pin 6 as output (timer toggle)
+    TRISDbits.TRISD0 = 0;   // RD0 P7 pin 14 as output (SYNC signal)
     
     UART1_begin(9600);
     UART2_begin(9600);
@@ -340,22 +333,6 @@ void main(void)
     SPI2_begin();
     
     RPD8Rbits.RPD8R = 12; // OC1 on P7 pin 10 (LED PWM)
-    RPD0Rbits.RPD0R = 11; // OC2 on P7 pin 14 (tone)
-    
-    /* Configure Timer 2 for tone generation via PWM */
-    T2CONbits.TCKPS = 6;        // Timer 2 prescale: 64
-    
-    TMR2 = 0x00;                // Clear Timer 2 counter
-    PR2 = 1420;                 // Divisor for 440Hz
-    
-    T2CONbits.ON = 1;           // Enable Timer 2
-    
-    OC2CONbits.OCTSEL = 0;      // Source: Timer 2
-    OC2CONbits.OCM = 6;         // PWM mode
-    
-    OC2RS = 0;                  // Silent
-    
-    OC2CONbits.ON = 1;          // Enable OC2 PWM
     
     /* Configure Timer 3 for 10-bit PWM */
     T3CONbits.TCKPS = 6;        // Timer 3 prescale: 64
@@ -421,7 +398,6 @@ void main(void)
         LED5 = 1;
         
         OC1RS = 0;
-        toneT2(440);
         
         delayms(500);
         
@@ -441,7 +417,6 @@ void main(void)
         LED2 = 0;
         
         OC1RS = 128;
-        toneT2(0);
         
         delayms(500);
         
@@ -451,7 +426,6 @@ void main(void)
         LED3 = 0;
         
         OC1RS = 256;
-        toneT2(880);
         
         delayms(500);
         
@@ -461,7 +435,6 @@ void main(void)
         LED4 = 0;
         
         OC1RS = 512;
-        toneT2(0);
         
         delayms(500);
         
@@ -471,7 +444,6 @@ void main(void)
         LED5 = 0;
         
         OC1RS = 1023;
-        toneT2(440 * 8);
         
         delayms(500);
     }
