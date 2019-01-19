@@ -1,15 +1,25 @@
 # PIC32DDS
 
 Generate audio-frequency signals from an MCP4822 dual 12-bit DAC
-connected via SPI to a PIC32MX550F256L. SPI clock at 2MHz.
+connected via SPI to a PIC32MX550F256L.
+SPI clock at 2MHz.
 New samples sent to DAC at 44.1kHz.
-SYNC pin set HIGH at beginning of synthesised waveform cycle and LOW at the end.
+SYNC pin set HIGH at beginning of synthesised waveform cycle and LOW
+at the end.
 
-* SCK2 RG6  pin 10 to MCP4822 SCK pin 3
-* SDO2 RC13 pin 73 to MCP4822 SDI pin 4
-* SS   RD9  pin 69 to MCP4822 CS  pin 2
+DAC connections:
+
+| Signal | Chip  | Name      | Pin | Chip    | Name | Pin |
+|--------|-------|-----------|-----|---------|------|-----|
+| SCK    | PIC32 | RG6/SCK2  | 10  | MCP4822 | SCK  | 3   |
+| MOSI   | PIC32 | RC13/SDO2 | 73  | MCP4822 | SDI  | 4   |
+| SS     | PIC32 | RD9       | 69  | MCP4822 | CS   | 2   |
+
+Digital output:
 
 * SYNC RD0 pin 72
+
+Debugging LEDs on dev board:
 
 * LED1 RE6 pin 4
 * LED2 RE7 pin 5
