@@ -276,15 +276,9 @@ uint16_t analogRead(const int chan)
 
 static void SPI2_begin(const int baud)
 {
-        
-    /* Configure SPI1 */
-    // SCK1 on pin 70 - can't use on this PCB
-    //SDI1Rbits.SDI1R = 0;   // SDI1 on RPD3
-    //RPC13Rbits.RPC13R = 8; // SDO1 on RPC13
-    
     /* Configure SPI2 */
     // SCK2 on pin 10, RG6, P1 pin 32
-    SDI2Rbits.SDI2R = 0;   // SDI1 on RPD3, pin 
+    SDI2Rbits.SDI2R = 0;   // SDI2 on RPD3, pin 78
     RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73, P7 pin 16
     
     SPI2BRG = (20000000 / baud) - 1;
@@ -295,7 +289,8 @@ static void SPI2_begin(const int baud)
     SPI2CONbits.STXISEL = 0; // Interrupt on Tx complete
     SPI2CONbits.SRXISEL = 3; // Interrupt on Rx full
     
-    TRISDbits.TRISD9 = 0;   // RD9 P7 pin 12 as output for SS
+    TRISDbits.TRISD9 = 0;   // RD9 pin 69, P7 pin 12 as output for SS
+    LATDSET = _LATD_LATD9_MASK;   // De-assert SS for SPI2
     
     IPC8bits.SPI2IP = 3;          // SPI2 interrupt priority 3
     IPC8bits.SPI2IS = 1;          // SPI2 interrupt sub-priority 1
