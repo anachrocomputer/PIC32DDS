@@ -58,7 +58,7 @@
 volatile uint32_t MilliSeconds = 0;
 
 volatile uint32_t PhaseAcc = 0;
-volatile uint32_t PhaseInc = 1024 * 1024;
+volatile uint32_t PhaseInc = 0;
 uint16_t Sinbuf[4096];
 
 
@@ -274,7 +274,7 @@ uint16_t analogRead(const int chan)
     return (ADC1BUF0);
 }
 
-static void SPI2_begin(void)
+static void SPI2_begin(const int baud)
 {
         
     /* Configure SPI1 */
@@ -287,7 +287,7 @@ static void SPI2_begin(void)
     SDI2Rbits.SDI2R = 0;   // SDI1 on RPD3, pin 
     RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73, P7 pin 16
     
-    SPI2BRG = 9;            // 2MHz
+    SPI2BRG = (20000000 / baud) - 1;
     SPI2CONbits.MSTEN = 1;  // Master mode
     SPI2CONbits.MODE16 = 1; // 16-bit mode
     SPI2CONbits.MODE32 = 0;
@@ -303,6 +303,11 @@ static void SPI2_begin(void)
     IFS1CLR = _IFS1_SPI2RXIF_MASK;  // Clear SPI2 Rx interrupt flag
     
     SPI2CONbits.ON = 1;
+}
+
+void DDS_SetFreq(const int freq)
+{
+    PhaseInc = 97348 * freq;  // 97391.548662132 = 4294967296 / 44100
 }
 
 void main(void)
@@ -330,7 +335,7 @@ void main(void)
 
     ADC_begin();
     
-    SPI2_begin();
+    SPI2_begin(2000000);
     
     RPD8Rbits.RPD8R = 12; // OC1 on P7 pin 10 (LED PWM)
     
@@ -390,6 +395,7 @@ void main(void)
     while(1)
     {
         U1TXREG = 'A';
+        DDS_SetFreq(440);
         
         LED1 = 0;
         LED2 = 1;
@@ -413,6 +419,8 @@ void main(void)
             U2TXREG = buf[i];
         }
         
+        DDS_SetFreq(440 * 2);
+        
         LED1 = 1;
         LED2 = 0;
         
@@ -421,6 +429,7 @@ void main(void)
         delayms(500);
         
         U3TXREG = 'C';
+        DDS_SetFreq(440 * 4);
         
         LED2 = 1;
         LED3 = 0;
@@ -430,6 +439,7 @@ void main(void)
         delayms(500);
         
         U4TXREG = 'D';
+        DDS_SetFreq(440 * 8);
         
         LED3 = 1;
         LED4 = 0;
@@ -439,6 +449,7 @@ void main(void)
         delayms(500);
         
         U5TXREG = 'E';
+        DDS_SetFreq(220);
         
         LED4 = 1;
         LED5 = 0;
