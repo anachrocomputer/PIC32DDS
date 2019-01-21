@@ -55,6 +55,53 @@
 #define LED4        LATAbits.LATA7
 #define LED5        LATAbits.LATA6
 
+// Size of 128x64 OLED screen
+#define MAXX 128
+#define MAXY 64
+#define MAXROWS 8
+
+// Co-ord of centre of screen
+#define CENX (MAXX / 2)
+#define CENY (MAXY / 2)
+
+// SSD1306 command bytes
+#define SSD1306_SETCONTRAST 0x81
+#define SSD1306_DISPLAYALLON_RESUME 0xA4
+#define SSD1306_DISPLAYALLON 0xA5
+#define SSD1306_NORMALDISPLAY 0xA6
+#define SSD1306_INVERTDISPLAY 0xA7
+#define SSD1306_DISPLAYOFF 0xAE
+#define SSD1306_DISPLAYON 0xAF
+
+#define SSD1306_SETDISPLAYOFFSET 0xD3
+#define SSD1306_SETCOMPINS 0xDA
+
+#define SSD1306_SETVCOMDETECT 0xDB
+
+#define SSD1306_SETDISPLAYCLOCKDIV 0xD5
+#define SSD1306_SETPRECHARGE 0xD9
+
+#define SSD1306_SETMULTIPLEX 0xA8
+
+#define SSD1306_SETLOWCOLUMN 0x00
+#define SSD1306_SETHIGHCOLUMN 0x10
+
+#define SSD1306_SETSTARTLINE 0x40
+
+#define SSD1306_MEMORYMODE 0x20
+#define SSD1306_COLUMNADDR 0x21
+#define SSD1306_PAGEADDR   0x22
+
+#define SSD1306_COMSCANINC 0xC0
+#define SSD1306_COMSCANDEC 0xC8
+
+#define SSD1306_SEGREMAP 0xA0
+
+#define SSD1306_CHARGEPUMP 0x8D
+
+// The frame buffer, 1024 bytes
+unsigned char Frame[MAXROWS][MAXX];
+
 volatile uint32_t MilliSeconds = 0;
 
 volatile uint32_t PhaseAcc = 0;
@@ -409,9 +456,158 @@ void DDS_SetFreq(const int freq)
     PhaseInc = 97348 * freq;  // 97391.548662132 = 4294967296 / 44100
 }
 
+
+/* oledData --- send a data byte to the OLED by fast hardware SPI */
+
+inline void oledData(const uint8_t d)
+{
+    static char data[2];
+    
+    while (SPIbytesPending() > 0)
+        ;
+    
+    LATGbits.LATG9 = 1;  // DC HIGH
+    
+    data[0] = d;
+    SPIwrite(data, 1);
+}
+
+
+/* oledCmd --- send a command byte to the OLED by fast hardware SPI */
+
+inline void oledCmd(const uint8_t c)
+{
+    static char cmd[2];
+    
+    while (SPIbytesPending() > 0)
+        ;
+    
+    LATGbits.LATG9 = 0;  // DC LOW
+    
+    cmd[0] = c;
+    SPIwrite(cmd, 1);
+}
+
+
+/* updscreen --- update the physical screen from the buffer */
+
+static void updscreen(void)
+{
+// This function contains an eight-way unrolled loop. In the Arduino
+// IDE, the default GCC optimisation switch is -Os, which optimises
+// for space. No automatic loop unrolling is done by the compiler, so
+// we do it explicitly here to save a few microseconds.
+//  long int before, after;
+//  unsigned char r, c;
+    uint8_t *p;
+    int i;
+
+    oledCmd(SSD1306_COLUMNADDR);
+    oledCmd(0);   // Column start address (0 = reset)
+    oledCmd(MAXX - 1); // Column end address (127 = reset)
+
+    oledCmd(SSD1306_PAGEADDR);
+    oledCmd(0); // Page start address (0 = reset)
+    oledCmd(7); // Page end address
+
+//  before = micros ();
+
+    p = &Frame[0][0];
+
+    for (i = 0; i < ((MAXROWS * MAXX) / 8); i++) {
+        oledData(*p++);
+        oledData(*p++);
+        oledData(*p++);
+        oledData(*p++);
+        oledData(*p++);
+        oledData(*p++);
+        oledData(*p++);
+        oledData(*p++);
+    }
+
+/*
+    The slow way...
+    for (r = 0; r < MAXROWS; r++) {
+        for (c = 0; c < MAXX; c++) {
+            oledData(Frame[r][c]);
+        }
+    }
+*/
+
+//  after = micros ();
+  
+//  Serial.print (after - before);
+//  Serial.println ("us updscreen");
+}
+
+
+/* OLED_begin --- initialise the 128x64 OLED */
+
+void OLED_begin(void)
+{
+    /* Configure I/O pins on PIC32 */
+    TRISEbits.TRISE8 = 0;     // RE8, pin 18, P1 pin 22, as output for RES
+    TRISGbits.TRISG9 = 0;     // RG9, pin 14, P1 pin 26, as output for DC
+
+    LATEbits.LATE8 = 1;       // RES pin HIGH initially
+    LATGbits.LATG9 = 1;       // DC pin HIGH initially
+
+    /* Start configuring the SSD1306 OLED controller */
+    delayms(1);
+    LATEbits.LATE8 = 0;     // Hardware reset for 10ms
+    delayms(10);
+    LATEbits.LATE8 = 1;
+
+    // Init sequence for 128x64 OLED module
+    oledCmd(SSD1306_DISPLAYOFF);                    // 0xAE
+    oledCmd(SSD1306_SETDISPLAYCLOCKDIV);            // 0xD5
+    oledCmd(0x80);                                  // the suggested ratio 0x80
+    oledCmd(SSD1306_SETMULTIPLEX);                  // 0xA8
+    oledCmd(0x3F);
+    oledCmd(SSD1306_SETDISPLAYOFFSET);              // 0xD3
+    oledCmd(0x0);                                   // no offset
+    oledCmd(SSD1306_SETSTARTLINE | 0x0);            // line #0
+    oledCmd(SSD1306_CHARGEPUMP);                    // 0x8D
+    oledCmd(0x14);
+    oledCmd(SSD1306_MEMORYMODE);                    // 0x20
+    oledCmd(0x00);                                  // 0x0 act like ks0108
+    oledCmd(SSD1306_SEGREMAP | 0x1);
+    oledCmd(SSD1306_COMSCANDEC);
+    oledCmd(SSD1306_SETCOMPINS);                    // 0xDA
+    oledCmd(0x12);
+    oledCmd(SSD1306_SETCONTRAST);                   // 0x81
+    oledCmd(0xCF);
+    oledCmd(SSD1306_SETPRECHARGE);                  // 0xd9
+    oledCmd(0xF1);
+    oledCmd(SSD1306_SETVCOMDETECT);                 // 0xDB
+    oledCmd(0x40);
+    oledCmd(SSD1306_DISPLAYALLON_RESUME);           // 0xA4
+    oledCmd(SSD1306_NORMALDISPLAY);                 // 0xA6
+
+    oledCmd(SSD1306_DISPLAYON); // Turn on OLED panel
+}
+
+
+/* greyFrame --- clear entire frame to checkerboard pattern */
+
+void greyFrame(void)
+{
+    int r, c;
+
+    for (r = 0; r < MAXROWS; r++)
+    {
+        for (c = 0; c < MAXX; c += 2)
+        {
+            Frame[r][c] = 0xaa;
+            Frame[r][c + 1] = 0x55;
+        }
+    }
+}
+
+
 void main(void)
 {
-    static uint8_t hello[] = "Hello, world\r\n";
+    static uint8_t pixels[] = {0x03, 0x0c, 0x30, 0xc0};
     char buf[32];
     int i;
     double delta;
@@ -493,11 +689,17 @@ void main(void)
     
     __asm__("EI");              // Global interrupt enable
     
+    OLED_begin();
+    
+    greyFrame();
+    
+    updscreen();
+    
     while(1)
     {
         U1TXREG = 'A';
         DDS_SetFreq(440);
-        SPIwrite(hello, sizeof (hello) - 1);
+        SPIwrite(pixels, sizeof (pixels));
         
         LED1 = 0;
         LED2 = 1;
