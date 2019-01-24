@@ -9,6 +9,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 // PIC32MX360F512L Configuration Bit Settings
  
@@ -101,6 +102,9 @@
 
 // The frame buffer, 1024 bytes
 unsigned char Frame[MAXROWS][MAXX];
+
+// DDS splash screen
+#include "ddslogo.h"
 
 volatile uint32_t MilliSeconds = 0;
 
@@ -493,51 +497,21 @@ inline void oledCmd(const uint8_t c)
 
 static void updscreen(void)
 {
-// This function contains an eight-way unrolled loop. In the Arduino
-// IDE, the default GCC optimisation switch is -Os, which optimises
-// for space. No automatic loop unrolling is done by the compiler, so
-// we do it explicitly here to save a few microseconds.
-//  long int before, after;
-//  unsigned char r, c;
-    uint8_t *p;
-    int i;
+    static uint8_t addrCmd[] = {SSD1306_COLUMNADDR, 0, MAXX - 1, SSD1306_PAGEADDR, 0, 7};
 
-    oledCmd(SSD1306_COLUMNADDR);
-    oledCmd(0);   // Column start address (0 = reset)
-    oledCmd(MAXX - 1); // Column end address (127 = reset)
-
-    oledCmd(SSD1306_PAGEADDR);
-    oledCmd(0); // Page start address (0 = reset)
-    oledCmd(7); // Page end address
-
-//  before = micros ();
-
-    p = &Frame[0][0];
-
-    for (i = 0; i < ((MAXROWS * MAXX) / 8); i++) {
-        oledData(*p++);
-        oledData(*p++);
-        oledData(*p++);
-        oledData(*p++);
-        oledData(*p++);
-        oledData(*p++);
-        oledData(*p++);
-        oledData(*p++);
-    }
-
-/*
-    The slow way...
-    for (r = 0; r < MAXROWS; r++) {
-        for (c = 0; c < MAXX; c++) {
-            oledData(Frame[r][c]);
-        }
-    }
-*/
-
-//  after = micros ();
-  
-//  Serial.print (after - before);
-//  Serial.println ("us updscreen");
+    while (SPIbytesPending() > 0)
+        ;
+    
+    LATGbits.LATG9 = 0;  // DC LOW
+    
+    SPIwrite(addrCmd, sizeof (addrCmd));
+    
+    while (SPIbytesPending() > 0)
+        ;
+    
+    LATGbits.LATG9 = 1;  // DC HIGH
+    
+    SPIwrite(&Frame[0][0], MAXROWS * MAXX);
 }
 
 
@@ -607,7 +581,6 @@ void greyFrame(void)
 
 void main(void)
 {
-    static uint8_t pixels[] = {0x03, 0x0c, 0x30, 0xc0};
     char buf[32];
     int i;
     double delta;
@@ -691,15 +664,13 @@ void main(void)
     
     OLED_begin();
     
-    greyFrame();
-    
-    updscreen();
-    
     while(1)
     {
         U1TXREG = 'A';
         DDS_SetFreq(440);
-        SPIwrite(pixels, sizeof (pixels));
+        greyFrame();
+    
+        updscreen();
         
         LED1 = 0;
         LED2 = 1;
@@ -731,6 +702,9 @@ void main(void)
         OC1RS = 128;
         
         delayms(500);
+        memcpy(Frame, DdsLogo, sizeof (Frame));
+    
+        updscreen();
         
         U3TXREG = 'C';
         DDS_SetFreq(440 * 4);
