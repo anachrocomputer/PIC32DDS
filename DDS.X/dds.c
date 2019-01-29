@@ -455,6 +455,22 @@ int SPIbytesPending(void)
     return (SPIDummyReads);
 }
 
+
+static void I2C1_begin(const int speed)
+{
+    if (speed > 200)
+    {
+        I2C1BRG = 0x2c;     // 400kHz
+    }
+    else
+    {
+        I2C1BRG = 0xc2;     // 100kHz
+    }
+    
+    I2C1CONSET = _I2C1CON_ON_MASK;  // Enable I2C1
+}
+
+
 void DDS_SetFreq(const int freq)
 {
     PhaseInc = 97348 * freq;  // 97391.548662132 = 4294967296 / 44100
@@ -716,6 +732,8 @@ void main(void)
     UART5_begin(9600);
 
     ADC_begin();
+    
+    I2C1_begin(100);
     
     SPI2_begin(2000000);
     SPI3_begin(1000000);
