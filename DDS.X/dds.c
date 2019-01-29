@@ -1,4 +1,4 @@
-/* dds --- generate audio via MCP4822 SPI DAC on PIC32 dev board       */
+/* dds --- generate audio via MCP4822 SPI DAC on PIC32      2019-01-17 */
 /* Copyright (c) 2019 John Honniball. All rights reserved              */
 
 /*
@@ -579,6 +579,114 @@ void greyFrame(void)
 }
 
 
+/* PPS_begin --- map Peripheral Pin Select to suit dev board */
+
+static void PPS_begin(void)
+{
+    /* Configure USART1 */
+    RPE5Rbits.RPE5R = 3;    // U1Tx on pin 3, RPE5
+    U1RXRbits.U1RXR = 10;   // U1Rx on pin 6, RPC1
+    
+    /* Configure USART2 */
+    RPG0Rbits.RPG0R = 1;    // U2Tx on pin 90, RPG0
+    U2RXRbits.U2RXR = 12;   // U2Rx on pin 89, RPG1 (5V tolerant)
+    
+    /* Configure USART3 */
+    RPF1Rbits.RPF1R = 1;    // U3Tx on pin 88, RPF1
+    U3RXRbits.U3RXR = 4;    // U3Rx on pin 87, RPF0
+    
+    /* Configure USART4 */
+    RPD4Rbits.RPD4R = 2;    // U4Tx on pin 81, RPD4
+    U4RXRbits.U4RXR = 6;    // U4Rx on pin 82, RPD5 (5V tolerant)
+    
+    /* Configure USART5 */
+    RPD12Rbits.RPD12R = 4;  // U5Tx on pin 79, RPD12
+    U5RXRbits.U5RXR = 0;    // U5Rx on pin 76, RPD1
+    
+    /* Configure OC pins (PWM) */
+    RPD8Rbits.RPD8R = 12; // OC1 on P7 pin 10 (LED PWM)
+    RPD0Rbits.RPD0R = 11; // OC2 on P7 pin 14 (tone)
+    
+    /* Configure SPI1 */
+    // SCK1 on pin 70 RD10 - can't use on this PCB
+    //SDI1Rbits.SDI1R = 0;   // SDI1 on RPD3
+    //RPC13Rbits.RPC13R = 8; // SDO1 on RPC13
+    
+    /* Configure SPI2 */
+    // SCK2 on pin 10, RG6, P1 pin 32
+    SDI2Rbits.SDI2R = 0;   // SDI2 on RPD3, pin 78
+    RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73, P7 pin 16
+    
+    /* Configure SPI3 */
+    // SCK3 on pin 39, RF13, P1 pin 15
+    SDI3Rbits.SDI3R = 0;   // SDI3 on RPD2, pin 77
+    RPG8Rbits.RPG8R = 14;  // SDO3 on RPG8, pin 12, P1 pin 28
+    
+    /* Configure SPI4 */
+    // SCK4 on pin 48, RD15 blocked by Main current sense
+    
+    /* Configure I2C1 */
+    // SCL1 on RA14, pin 66, P1 pin 19
+    // SDA1 on RA15, pin 67, P1 pin 21
+    
+    /* Configure I2C2 */
+    // SCL2 on RA2, pin 58, P7 pin 20
+    // SDA2 on RA3, pin 59, P7 pin 22
+}
+
+
+/* TRIS_begin --- switch GPIO pins to input or output as required */
+
+static void TRIS_begin(void)
+{
+    TRISEbits.TRISE6 = 0;   // LED1 pin 4 as output
+    TRISEbits.TRISE7 = 0;   // LED2 pin 5 as output
+    TRISEbits.TRISE1 = 0;   // LED3 pin 94 as output
+    TRISAbits.TRISA7 = 0;   // LED4 pin 92 as output
+    TRISAbits.TRISA6 = 0;   // LED5 pin 91 as output
+    
+    TRISGbits.TRISG15 = 0;  // U1EN pin 1 as output
+    TRISEbits.TRISE2 = 0;   // U2EN pin 98 as output
+    TRISGbits.TRISG12 = 0;  // U3EN pin 96 as output
+    TRISDbits.TRISD13 = 0;  // U4EN pin 80 as output
+    TRISDbits.TRISD11 = 0;  // U5EN pin 71 as output
+    
+    TRISEbits.TRISE3 = 1;   // U1FAULT pin 99 as input
+    TRISGbits.TRISG13 = 1;  // U2FAULT pin 97 as input
+    TRISGbits.TRISG14 = 1;  // U3FAULT pin 95 as input
+    TRISDbits.TRISD3 = 1;   // U4FAULT pin 78 as input
+    TRISDbits.TRISD10 = 1;  // U5FAULT pin 70 as input
+    TRISFbits.TRISF5 = 1;   // Main current FAULT pin 50 as input
+    TRISFbits.TRISF4 = 1;   // Motor current FAULT pin 49 as input
+    
+    ANSELEbits.ANSE4 = 1;   // U1 current sense pin 100, RE4, AN21, analog
+    ANSELEbits.ANSE0 = 1;   // U2 current sense pin 93, RE0, AN46, analog
+    ANSELDbits.ANSD7 = 1;   // U3 current sense pin 84, RD7, AN43, analog
+    ANSELDbits.ANSD6 = 1;   // U4 current sense pin 83, RD6, AN42, analog
+    ANSELDbits.ANSD2 = 1;   // U5 current sense pin 77, RD2, AN25, analog
+    ANSELDbits.ANSD14 = 1;  // Main current sense pin 47, RD14, AN36, analog
+    ANSELDbits.ANSD15 = 1;  // Motor current sense pin 48, RD15, AN37, analog (blocks SCK4)
+
+    TRISEbits.TRISE4 = 1;   // U1 current sense pin 100, RE4, AN21, input
+    TRISEbits.TRISE0 = 1;   // U2 current sense pin 93, RE0, AN46, input
+    TRISDbits.TRISD7 = 1;   // U3 current sense pin 84, RD7, AN43, input
+    TRISDbits.TRISD6 = 1;   // U4 current sense pin 83, RD6, AN42, input
+    TRISDbits.TRISD2 = 1;   // U5 current sense pin 77, RD2, AN25, input
+    TRISDbits.TRISD14 = 1;  // Main current sense pin 47, RD14, AN36, input
+    TRISDbits.TRISD15 = 1;  // Motor current sense pin 48, RD15, AN37, input (blocks SCK4)
+    
+    TRISBbits.TRISB15 = 0;  // HV_EN pin 44 as output
+    
+    // TODO: Add head LEDs and Add-On ports on daughter board
+    
+    ANSELBbits.ANSB6 = 1;   // Pot on pin 26, P1-37, RB6, AN6 analog
+    TRISBbits.TRISB6 = 1;   // Pot on pin 26, P1-37, RB6, AN6 input
+    
+    TRISAbits.TRISA4 = 0;   // RA4 pin 60, P7 pin 6 as output (timer toggle)
+    TRISDbits.TRISD0 = 0;   // RD0 pin 72, P7 pin 14 as output (SYNC signal)
+}
+
+
 void main(void)
 {
     char buf[32];
@@ -586,15 +694,20 @@ void main(void)
     double delta;
     uint16_t ana;
     
-    /* Configure tri-state registers*/
-    TRISEbits.TRISE6 = 0;   // LED1 as output
-    TRISEbits.TRISE7 = 0;   // LED2 as output
-    TRISEbits.TRISE1 = 0;   // LED3 as output
-    TRISAbits.TRISA7 = 0;   // LED5 as output
-    TRISAbits.TRISA6 = 0;   // LED5 as output
+    /* Set up peripherals to match pin connections on PCB */
+    PPS_begin();
     
-    TRISAbits.TRISA4 = 0;   // RA4 P7 pin 6 as output (timer toggle)
-    TRISDbits.TRISD0 = 0;   // RD0 P7 pin 14 as output (SYNC signal)
+    /* Configure tri-state registers*/
+    TRIS_begin();
+    
+    LATBbits.LATB15 = 0;  // HV_EN pin 44 LOW (6V regulator OFF)
+    
+    /* Switch off the MOSFETs */
+    LATGbits.LATG15 = 0;  // U1EN pin 1 OFF
+    LATEbits.LATE2 = 0;   // U2EN pin 98 OFF
+    LATGbits.LATG12 = 0;  // U3EN pin 96 OFF
+    LATDbits.LATD13 = 0;  // U4EN pin 80 OFF
+    LATDbits.LATD11 = 0;  // U5EN pin 71 OFF
     
     UART1_begin(9600);
     UART2_begin(9600);
