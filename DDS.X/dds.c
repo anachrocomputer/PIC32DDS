@@ -620,8 +620,8 @@ static void PPS_begin(void)
     U5RXRbits.U5RXR = 0;    // U5Rx on pin 76, RPD1
     
     /* Configure OC pins (PWM) */
-    RPD8Rbits.RPD8R = 12; // OC1 on P7 pin 10 (LED PWM)
-    RPD0Rbits.RPD0R = 11; // OC2 on P7 pin 14 (tone)
+    RPD8Rbits.RPD8R = 12; // OC1 on pin 68, P7 pin 10 (LED PWM)
+    RPD0Rbits.RPD0R = 11; // OC2 on pin 72, P7 pin 14 (tone)
     
     /* Configure SPI1 */
     // SCK1 on pin 70 RD10 - can't use on this PCB
@@ -713,7 +713,7 @@ void main(void)
     /* Set up peripherals to match pin connections on PCB */
     PPS_begin();
     
-    /* Configure tri-state registers*/
+    /* Configure tri-state registers */
     TRIS_begin();
     
     LATBbits.LATB15 = 0;  // HV_EN pin 44 LOW (6V regulator OFF)
