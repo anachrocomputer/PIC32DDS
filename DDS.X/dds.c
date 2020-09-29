@@ -100,6 +100,41 @@
 
 #define SSD1306_CHARGEPUMP 0x8D
 
+#define UART_RX_BUFFER_SIZE  (128)
+#define UART_RX_BUFFER_MASK (UART_RX_BUFFER_SIZE - 1)
+#if (UART_RX_BUFFER_SIZE & UART_RX_BUFFER_MASK) != 0
+#error UART_RX_BUFFER_SIZE must be a power of two and <= 256
+#endif
+
+#define UART_TX_BUFFER_SIZE  (128)
+#define UART_TX_BUFFER_MASK (UART_TX_BUFFER_SIZE - 1)
+#if (UART_TX_BUFFER_SIZE & UART_TX_BUFFER_MASK) != 0
+#error UART_TX_BUFFER_SIZE must be a power of two and <= 256
+#endif
+
+struct UART_RX_BUFFER
+{
+    volatile uint8_t head;
+    volatile uint8_t tail;
+    uint8_t buf[UART_RX_BUFFER_SIZE];
+};
+
+struct UART_TX_BUFFER
+{
+    volatile uint8_t head;
+    volatile uint8_t tail;
+    uint8_t buf[UART_TX_BUFFER_SIZE];
+};
+
+struct UART_BUFFER
+{
+    struct UART_TX_BUFFER tx;
+    struct UART_RX_BUFFER rx;
+};
+
+// UART buffers
+static struct UART_BUFFER U2Buf;
+
 // The frame buffer, 1024 bytes
 unsigned char Frame[MAXROWS][MAXX];
 
@@ -236,6 +271,51 @@ void __ISR(_SPI_3_VECTOR, ipl1AUTO) SPI3Handler(void)
     }
 }
 
+void __ISR(_UART_2_VECTOR, ipl1AUTO) UART2Handler(void)
+{
+    if (IFS1bits.U2TXIF)
+    {
+        if (U2Buf.tx.head != U2Buf.tx.tail) // Is there anything to send?
+        {
+            const uint8_t tmptail = (U2Buf.tx.tail + 1) & UART_TX_BUFFER_MASK;
+            
+            U2Buf.tx.tail = tmptail;
+
+            U2TXREG = U2Buf.tx.buf[tmptail];     // Transmit one byte
+        }
+        else
+        {
+            IEC1CLR = _IEC1_U2TXIE_MASK;         // Nothing left to send; disable Tx interrupt
+        }
+        
+        IFS1CLR = _IFS1_U2TXIF_MASK;  // Clear UART2 Tx interrupt flag
+    }
+    
+    if (IFS1bits.U2RXIF)
+    {
+        const uint8_t tmphead = (U2Buf.rx.head + 1) & UART_RX_BUFFER_MASK;
+        const uint8_t ch = U2RXREG;   // Read received byte from UART
+        
+        if (tmphead == U2Buf.rx.tail)   // Is receive buffer full?
+        {
+             // Buffer is full; discard new byte
+        }
+        else
+        {
+            U2Buf.rx.head = tmphead;
+            U2Buf.rx.buf[tmphead] = ch;   // Store byte in buffer
+        }
+        
+        IFS1CLR = _IFS1_U2RXIF_MASK;  // Clear UART2 Rx interrupt flag
+    }
+    
+    if (IFS1bits.U2EIF)
+    {
+        IFS1CLR = _IFS1_U2EIF_MASK;   // Clear UART2 error interrupt flag
+    }
+}
+
+
 static void UART1_begin(const int baud)
 {
     /* Configure PPS pins */
@@ -255,6 +335,11 @@ static void UART1_begin(const int baud)
 
 static void UART2_begin(const int baud)
 {
+    U2Buf.tx.head = 0;
+    U2Buf.tx.tail = 0;
+    U2Buf.rx.head = 0;
+    U2Buf.rx.tail = 0;
+    
     /* Configure PPS pins */
     RPG0Rbits.RPG0R = 1;    // U2Tx on pin 90, RPG0
     
@@ -266,8 +351,51 @@ static void UART2_begin(const int baud)
     
     U2BRG = (40000000 / (baud * 16)) - 1;
     
+    IPC9bits.U2IP = 1;          // UART2 interrupt priority 1
+    IPC9bits.U2IS = 2;          // UART2 interrupt sub-priority 2
+    
+    IFS1CLR = _IFS1_U2TXIF_MASK;  // Clear UART2 Tx interrupt flag
+    IFS1CLR = _IFS1_U2RXIF_MASK;  // Clear UART2 Rx interrupt flag
+    IFS1CLR = _IFS1_U2EIF_MASK;   // Clear UART2 error interrupt flag
+    
+    IEC1SET = _IEC1_U2RXIE_MASK;  // Enable UART2 Rx interrupt
+    IEC1SET = _IEC1_U2EIE_MASK;   // Enable UART2 error interrupt
+    
     U2MODESET = _U2MODE_ON_MASK;      // Enable USART2
 }
+
+uint8_t UART2RxByte(void)
+{
+    const uint8_t tmptail = (U2Buf.rx.tail + 1) & UART_RX_BUFFER_MASK;
+    
+    while (U2Buf.rx.head == U2Buf.rx.tail)  // Wait, if buffer is empty
+        ;
+    
+    U2Buf.rx.tail = tmptail;
+    
+    return (U2Buf.rx.buf[tmptail]);
+}
+
+
+void UART2TxByte(const uint8_t data)
+{
+    const uint8_t tmphead = (U2Buf.tx.head + 1) & UART_TX_BUFFER_MASK;
+    
+    while (tmphead == U2Buf.tx.tail)   // Wait, if buffer is full
+        ;
+
+    U2Buf.tx.buf[tmphead] = data;
+    U2Buf.tx.head = tmphead;
+
+    IEC1SET = _IEC1_U2TXIE_MASK;       // Enable UART2 Tx interrupt
+}
+
+
+bool UART2RxAvailable(void)
+{
+    return (U2Buf.rx.head != U2Buf.rx.tail);
+}
+
 
 static void UART3_begin(const int baud)
 {
@@ -316,6 +444,18 @@ static void UART5_begin(const int baud)
     
     U5MODESET = _U5MODE_ON_MASK;      // Enable USART5
 }
+
+void _mon_putc(const char ch)
+{
+    // See: https://microchipdeveloper.com/faq:81
+    if (ch == '\n')
+    {
+        UART2TxByte('\r');
+    }
+
+    UART2TxByte(ch); // Connect stdout to UART2
+}
+
 
 static void ADC_begin(void)
 {    
@@ -795,7 +935,9 @@ void main(void)
     
     OLED_begin();
     
-    while(1)
+    puts("DDS");
+    
+    while (1)
     {
         U1TXREG = 'A';
         DDS_SetFreq(440);
@@ -815,15 +957,7 @@ void main(void)
         
         ana = analogRead(6);
         
-        sprintf(buf, "%dms %d\r\n", millis(), ana);
-        
-        for (i = 0; buf[i] != '\0'; i++)
-        {
-            while (U2STAbits.UTXBF) // Wait while Tx buffer full
-                ;
-            
-            U2TXREG = buf[i];
-        }
+        printf("%dms %d\r\n", millis(), ana);
         
         DDS_SetFreq(440 * 2);
         
