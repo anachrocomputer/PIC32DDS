@@ -845,7 +845,6 @@ static void TRIS_begin(void)
 
 void main(void)
 {
-    char buf[32];
     int i;
     double delta;
     uint16_t ana;
