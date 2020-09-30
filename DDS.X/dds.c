@@ -649,6 +649,23 @@ inline void oledCmd(const uint8_t c)
 }
 
 
+/* oledCmd1b --- send two command bytes to the OLED by fast hardware SPI */
+
+inline void oledCmd1b(const uint8_t c, const uint8_t b)
+{
+    static char cmd[2];
+    
+    while (SPIbytesPending() > 0)
+        ;
+    
+    LATGbits.LATG9 = 0;  // DC LOW
+    
+    cmd[0] = c;
+    cmd[1] = b;
+    SPIwrite(cmd, 2);
+}
+
+
 /* updscreen --- update the physical screen from the buffer */
 
 static void updscreen(void)
@@ -671,9 +688,9 @@ static void updscreen(void)
 }
 
 
-/* OLED_begin --- initialise the 128x64 OLED */
+/* OLED_begin --- initialise the SSD1306 OLED */
 
-void OLED_begin(void)
+void OLED_begin(const int wd, const int ht)
 {
     /* Configure I/O pins on PIC32 */
     TRISEbits.TRISE8 = 0;     // RE8, pin 18, P1 pin 22, as output for RES
@@ -688,29 +705,29 @@ void OLED_begin(void)
     delayms(10);
     LATEbits.LATE8 = 1;
 
-    // Init sequence for 128x64 OLED module
+    // Init sequence for SSD1306 128x64 or 128x32 OLED module
     oledCmd(SSD1306_DISPLAYOFF);                    // 0xAE
-    oledCmd(SSD1306_SETDISPLAYCLOCKDIV);            // 0xD5
-    oledCmd(0x80);                                  // the suggested ratio 0x80
-    oledCmd(SSD1306_SETMULTIPLEX);                  // 0xA8
-    oledCmd(0x3F);
-    oledCmd(SSD1306_SETDISPLAYOFFSET);              // 0xD3
-    oledCmd(0x0);                                   // no offset
+    oledCmd1b(SSD1306_SETDISPLAYCLOCKDIV, 0x80);    // 0xD5, the suggested ratio 0x80
+    oledCmd1b(SSD1306_SETMULTIPLEX, 0x3F);          // 0xA8
+    oledCmd1b(SSD1306_SETDISPLAYOFFSET, 0x00);      // 0xD3, no offset
     oledCmd(SSD1306_SETSTARTLINE | 0x0);            // line #0
-    oledCmd(SSD1306_CHARGEPUMP);                    // 0x8D
-    oledCmd(0x14);
-    oledCmd(SSD1306_MEMORYMODE);                    // 0x20
-    oledCmd(0x00);                                  // 0x0 act like ks0108
+    oledCmd1b(SSD1306_CHARGEPUMP, 0x14);            // 0x8D
+    oledCmd1b(SSD1306_MEMORYMODE, 0x00);            // 0x20, 0x00 act like ks0108                                 // 
     oledCmd(SSD1306_SEGREMAP | 0x1);
     oledCmd(SSD1306_COMSCANDEC);
-    oledCmd(SSD1306_SETCOMPINS);                    // 0xDA
-    oledCmd(0x12);
-    oledCmd(SSD1306_SETCONTRAST);                   // 0x81
-    oledCmd(0xCF);
-    oledCmd(SSD1306_SETPRECHARGE);                  // 0xd9
-    oledCmd(0xF1);
-    oledCmd(SSD1306_SETVCOMDETECT);                 // 0xDB
-    oledCmd(0x40);
+    
+    if (ht < 64)
+    {
+        oledCmd1b(SSD1306_SETCOMPINS, 0x02);        // 0xDA
+    }
+    else
+    {
+        oledCmd1b(SSD1306_SETCOMPINS, 0x12);        // 0xDA
+    }
+    
+    oledCmd1b(SSD1306_SETCONTRAST, 0xCF);           // 0x81
+    oledCmd1b(SSD1306_SETPRECHARGE, 0xF1);          // 0xd9
+    oledCmd1b(SSD1306_SETVCOMDETECT, 0x40);         // 0xDB
     oledCmd(SSD1306_DISPLAYALLON_RESUME);           // 0xA4
     oledCmd(SSD1306_NORMALDISPLAY);                 // 0xA6
 
@@ -932,7 +949,7 @@ void main(void)
     
     __asm__("EI");              // Global interrupt enable
     
-    OLED_begin();
+    OLED_begin(MAXX, MAXY);
     
     puts("DDS");
     
