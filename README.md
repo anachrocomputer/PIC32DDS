@@ -1,4 +1,4 @@
-# PIC32DDS
+# PIC32DDS #
 
 Generate audio-frequency signals from an MCP4822 dual 12-bit DAC
 connected via SPI to a PIC32MX550F256L.
@@ -42,3 +42,12 @@ Debugging LEDs on dev board:
 PIC32 pin numbers are for the 100-pin package.
 
 LEDs light when the pin is pulled LOW.
+
+## PIC32 Toolchain ##
+
+MPLAB X V5.20 and 'xc32' V2.15. These are quite old versions now, so I really ought to upgrade!
+
+## PIC32 Programmer ##
+
+Microchip ICD3. Other programmers should work, e.g. ICD4 or PICkit4.
+
