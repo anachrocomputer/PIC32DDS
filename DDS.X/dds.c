@@ -624,7 +624,7 @@ void DDS_SetFreq(const int freq)
 
 /* oledData --- send a data byte to the OLED by fast hardware SPI */
 
-inline void oledData(const uint8_t d)
+inline static void oledData(const uint8_t d)
 {
     static char data[2];
     
@@ -640,7 +640,7 @@ inline void oledData(const uint8_t d)
 
 /* oledCmd --- send a command byte to the OLED by fast hardware SPI */
 
-inline void oledCmd(const uint8_t c)
+inline static void oledCmd(const uint8_t c)
 {
     static char cmd[2];
     
@@ -656,7 +656,7 @@ inline void oledCmd(const uint8_t c)
 
 /* oledCmd1b --- send two command bytes to the OLED by fast hardware SPI */
 
-inline void oledCmd1b(const uint8_t c, const uint8_t b)
+inline static void oledCmd1b(const uint8_t c, const uint8_t b)
 {
     static char cmd[2];
     

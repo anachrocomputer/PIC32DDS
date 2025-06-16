@@ -4,3 +4,5 @@ DDS.X/dist
 DDS.X/nbproject/Makefile-*
 DDS.X/nbproject/Package-*
 DDS.X/nbproject/private
+DDS.X/.generated_files/
+DDS.X/ddslogo.h

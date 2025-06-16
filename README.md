@@ -1,3 +1,7 @@
+![Static Badge](https://img.shields.io/badge/MCU-PIC32MX-green "MCU:PIC32MX")
+![Static Badge](https://img.shields.io/badge/IDE-MPLAB_X_V6.20-green "IDE:MPLAB_X_V6.20")
+![Static Badge](https://img.shields.io/badge/BOARD-Reach_Dev_PCB-green "BOARD:Reach Dev PCB")
+
 # PIC32DDS #
 
 Generate audio-frequency signals from an MCP4822 dual 12-bit DAC
@@ -45,9 +49,13 @@ LEDs light when the pin is pulled LOW.
 
 ## PIC32 Toolchain ##
 
-MPLAB X V5.20 and 'xc32' V2.15. These are quite old versions now, so I really ought to upgrade!
+MPLAB X V6.20 and 'xc32' V4.60.
+These are not quite the latest versions,
+but MPLAB X V6.20 is the last version to support my "long obsolete" ICD3 programmer.
 
 ## PIC32 Programmer ##
 
-Microchip ICD3. Other programmers should work, e.g. ICD4 or PICkit4.
+Microchip ICD3.
+Other programmers should work, e.g. ICD4 or PICkit4.
+
 
